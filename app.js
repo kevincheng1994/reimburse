@@ -210,8 +210,9 @@ async function extractPDFText(file) {
 // Returns "YYYYMMDD-YYYYMMDD" or null if not found.
 
 function parseDateRange(text) {
-  // Allow en-dash (–), em-dash (—), and regular hyphen
-  const re = /([A-Z][a-z]{2})\s+(\d{1,2})\s*[–—-]\s*([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})/;
+  // PDF.js may drop the en-dash between dates, leaving only spaces.
+  // Handles both "Jul 29  Aug 29, 2026" and "Mar 30 – Apr 30, 2026".
+  const re = /([A-Z][a-z]{2})\s+(\d{1,2})\s*[–—-]?\s+([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})/;
   const m = text.match(re);
   if (!m) return null;
 
@@ -400,10 +401,11 @@ $btnProcess.addEventListener('click', async () => {
     const text = await extractPDFText(receiptFile);
     const folderName = parseDateRange(text);
     if (!folderName) {
-      log('── 提取到的 PDF 文字如下（請截圖回報）──', 'error');
-      // Print the full text so we can identify the actual date format
-      text.split('\n').forEach(line => { if (line.trim()) log(line.trim()); });
-      throw new Error('無法辨識日期區間，請將上方文字截圖回報');
+      console.error('[PDF text]', text);
+      throw new Error(
+        '無法從收據辨識日期區間。\n' +
+        '請確認收據包含類似「Jul 29  Aug 29, 2026」的文字。',
+      );
     }
     log(`識別到日期區間：${folderName}`, 'success');
 
