@@ -128,7 +128,23 @@ function logLink(label, url) {
 function gapiLoaded() {}
 
 // Called by <script onload="gisLoaded()">
-function gisLoaded() {}
+function gisLoaded() {
+  tryAutoSignIn();
+}
+
+// If the user was previously signed in, silently re-acquire a token on page load.
+// GIS will skip the popup if consent was already granted for this client/scope.
+function tryAutoSignIn() {
+  if (!localStorage.getItem('reimb_signedIn')) return;
+  const clientId = $clientId.value.trim();
+  if (!clientId) return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: DRIVE_SCOPE,
+    callback: onTokenResponse,
+  });
+  tokenClient.requestAccessToken({ prompt: '' });
+}
 
 function handleSignIn() {
   if (typeof google === 'undefined' || !google.accounts?.oauth2) {
@@ -165,6 +181,7 @@ function onTokenResponse(resp) {
     return;
   }
   accessToken = resp.access_token;
+  localStorage.setItem('reimb_signedIn', '1');
   setAuthUI(true);
   log('已登入 Google Drive', 'success');
 }
@@ -172,6 +189,7 @@ function onTokenResponse(resp) {
 function handleSignOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
   accessToken = null;
+  localStorage.removeItem('reimb_signedIn');
   setAuthUI(false);
   log('已登出');
 }
