@@ -122,6 +122,28 @@ function logLink(label, url) {
   $log.scrollTop = $log.scrollHeight;
 }
 
+// ─── Token persistence ────────────────────────────────────────────────────────
+// GIS access tokens expire in ~1 hour. Store the token + expiry in localStorage
+// so the page can restore the session on refresh without any popup.
+
+function saveToken(token, expiresIn) {
+  const expiry = Date.now() + (parseInt(expiresIn, 10) - 60) * 1000; // 60s safety buffer
+  localStorage.setItem('reimb_accessToken', token);
+  localStorage.setItem('reimb_tokenExpiry', String(expiry));
+}
+
+function loadSavedToken() {
+  const token  = localStorage.getItem('reimb_accessToken');
+  const expiry = parseInt(localStorage.getItem('reimb_tokenExpiry') || '0', 10);
+  return (token && Date.now() < expiry) ? token : null;
+}
+
+function clearToken() {
+  localStorage.removeItem('reimb_accessToken');
+  localStorage.removeItem('reimb_tokenExpiry');
+  localStorage.removeItem('reimb_signedIn');
+}
+
 // ─── Google API: OAuth (GIS only — gapi not needed) ──────────────────────────
 
 // Called by <script onload="gapiLoaded()"> — kept for HTML compatibility but unused
@@ -132,9 +154,15 @@ function gisLoaded() {
   tryAutoSignIn();
 }
 
-// If the user was previously signed in, silently re-acquire a token on page load.
-// GIS will skip the popup if consent was already granted for this client/scope.
 function tryAutoSignIn() {
+  // If a valid token is stored, restore the session immediately — no popup needed.
+  const saved = loadSavedToken();
+  if (saved) {
+    accessToken = saved;
+    setAuthUI(true);
+    return;
+  }
+  // Token expired: try a silent GIS refresh (works when browser still has Google session).
   if (!localStorage.getItem('reimb_signedIn')) return;
   const clientId = $clientId.value.trim();
   if (!clientId) return;
@@ -181,6 +209,7 @@ function onTokenResponse(resp) {
     return;
   }
   accessToken = resp.access_token;
+  saveToken(resp.access_token, resp.expires_in || 3600);
   localStorage.setItem('reimb_signedIn', '1');
   setAuthUI(true);
   log('已登入 Google Drive', 'success');
@@ -189,7 +218,7 @@ function onTokenResponse(resp) {
 function handleSignOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
   accessToken = null;
-  localStorage.removeItem('reimb_signedIn');
+  clearToken();
   setAuthUI(false);
   log('已登出');
 }
