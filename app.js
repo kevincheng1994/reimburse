@@ -210,10 +210,12 @@ async function extractPDFText(file) {
 // Returns "YYYYMMDD-YYYYMMDD" or null if not found.
 
 function parseDateRange(text) {
-  // PDF.js may drop the en-dash between dates, leaving only spaces.
-  // Handles both "Jul 29  Aug 29, 2026" and "Mar 30 – Apr 30, 2026".
-  const re = /([A-Z][a-z]{2})\s+(\d{1,2})\s*[–—-]?\s+([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})/;
+  // Use [^A-Z\d]+ as separator: matches any chars that are not uppercase letters
+  // or digits — handles spaces, en-dash, em-dash, or any other PDF artifact.
+  const re = /([A-Z][a-z]{2})\s+(\d{1,2})[^A-Z\d]+([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})/;
   const m = text.match(re);
+  console.log('[PDF text]', text);
+  console.log('[date match]', m);
   if (!m) return null;
 
   const [, m1, d1, m2, d2, yearStr] = m;
