@@ -62,7 +62,7 @@ const $originHint    = document.getElementById('originHint');
 // ─── Settings (persisted to localStorage) ────────────────────────────────────
 
 $clientId.value     = localStorage.getItem('reimb_clientId')     || '';
-$parentFolder.value = localStorage.getItem('reimb_parentFolder') || '訂閱 Claude Pro';
+$parentFolder.value = localStorage.getItem('reimb_parentFolder') || '公司報帳/訂閱 Claude Pro';
 
 $clientId.addEventListener('change', () =>
   localStorage.setItem('reimb_clientId', $clientId.value.trim()));
@@ -225,7 +225,13 @@ async function extractPDFText(file) {
 
 // ─── Date range parsing ───────────────────────────────────────────────────────
 // Matches Claude Pro receipt text like "Mar 30 – Apr 30, 2026"
-// Returns "YYYYMMDD-YYYYMMDD" or null if not found.
+// Returns "YYYYMMDD-YYYYMMDD" (Taiwan time, +1 day) or null if not found.
+
+// Shift a date by deltaDays, handles month/year overflow automatically.
+function shiftDate(year, monthStr, dayStr, deltaDays) {
+  const d = new Date(year, parseInt(monthStr, 10) - 1, parseInt(dayStr, 10) + deltaDays);
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function parseDateRange(text) {
   // Use [^A-Z\d]+ as separator: matches any chars that are not uppercase letters
@@ -243,8 +249,9 @@ function parseDateRange(text) {
   // Cross-year case: e.g. Dec → Jan means start is previous year
   const startYear = parseInt(MONTH[m1], 10) > parseInt(MONTH[m2], 10) ? endYear - 1 : endYear;
 
-  const start = `${startYear}${MONTH[m1]}${d1.padStart(2, '0')}`;
-  const end   = `${endYear}${MONTH[m2]}${d2.padStart(2, '0')}`;
+  // +1 day to convert from US billing date to Taiwan date (UTC+8)
+  const start = shiftDate(startYear, MONTH[m1], d1, 1);
+  const end   = shiftDate(endYear,   MONTH[m2], d2, 1);
   return `${start}-${end}`;
 }
 
@@ -386,6 +393,19 @@ async function findOrCreateFolder(name, parentId = null) {
   );
 }
 
+// Resolve a '/'-separated folder path, creating each level as needed.
+// e.g. "公司報帳/訂閱 Claude Pro" → creates two nested folders, returns innermost.
+async function resolveFolderPath(path) {
+  const parts = path.split('/').map(p => p.trim()).filter(Boolean);
+  let parentId = null;
+  let folder = null;
+  for (const part of parts) {
+    folder = await findOrCreateFolder(part, parentId);
+    parentId = folder.id;
+  }
+  return folder;
+}
+
 // Upload any file (File, Blob, or ArrayBuffer) to a Drive folder.
 async function uploadToDrive(data, name, mimeType, folderId) {
   const blob = data instanceof Blob
@@ -433,12 +453,12 @@ $btnProcess.addEventListener('click', async () => {
     log('合併收據與刷卡通知截圖...');
     const combined     = await buildCombinedCanvas(receiptFile, paymentFile);
     const pdfBytes     = await buildOutputPDF(combined);
-    log('附件.pdf 已產生', 'success');
+    log('報帳憑據.pdf 已產生', 'success');
 
     // ── 3. Create folder structure in Google Drive ────────────────────────
-    const parentName = $parentFolder.value.trim() || '訂閱 Claude Pro';
-    log(`Google Drive：尋找或建立「${parentName}」...`);
-    const parent = await findOrCreateFolder(parentName);
+    const parentPath = $parentFolder.value.trim() || '公司報帳/訂閱 Claude Pro';
+    log(`Google Drive：尋找或建立「${parentPath}」...`);
+    const parent = await resolveFolderPath(parentPath);
 
     log(`Google Drive：尋找或建立「${folderName}」...`);
     const folder = await findOrCreateFolder(folderName, parent.id);
@@ -453,14 +473,14 @@ $btnProcess.addEventListener('click', async () => {
     await uploadToDrive(paymentFile, paymentFile.name, paymentFile.type, folder.id);
     log(`已上傳 ${paymentFile.name}`, 'success');
 
-    log('上傳 附件.pdf...');
+    log('上傳 報帳憑據.pdf...');
     await uploadToDrive(
       new Blob([pdfBytes], { type: 'application/pdf' }),
-      '附件.pdf',
+      '報帳憑據.pdf',
       'application/pdf',
       folder.id,
     );
-    log('已上傳 附件.pdf', 'success');
+    log('已上傳 報帳憑據.pdf', 'success');
 
     // ── Done ──────────────────────────────────────────────────────────────
     log('───────────────────────────');
