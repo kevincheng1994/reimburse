@@ -20,17 +20,45 @@ let gapiReady    = false;
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 
-const $clientId     = document.getElementById('clientId');
-const $parentFolder = document.getElementById('parentFolder');
-const $receiptInput = document.getElementById('receiptInput');
-const $paymentInput = document.getElementById('paymentInput');
-const $btnSignIn    = document.getElementById('btnSignIn');
-const $btnSignOut   = document.getElementById('btnSignOut');
-const $btnProcess   = document.getElementById('btnProcess');
-const $authStatus   = document.getElementById('authStatus');
-const $log          = document.getElementById('log');
-const $dzReceipt    = document.getElementById('dzReceipt');
-const $dzPayment    = document.getElementById('dzPayment');
+const $clientId      = document.getElementById('clientId');
+const $parentFolder  = document.getElementById('parentFolder');
+const $receiptInput  = document.getElementById('receiptInput');
+const $paymentInput  = document.getElementById('paymentInput');
+const $btnSignIn     = document.getElementById('btnSignIn');
+const $btnSignOut    = document.getElementById('btnSignOut');
+const $btnProcess    = document.getElementById('btnProcess');
+const $authStatus    = document.getElementById('authStatus');
+const $log           = document.getElementById('log');
+const $dzReceipt     = document.getElementById('dzReceipt');
+const $dzPayment     = document.getElementById('dzPayment');
+const $currentOrigin = document.getElementById('currentOrigin');
+const $btnCopyOrigin = document.getElementById('btnCopyOrigin');
+const $originHint    = document.getElementById('originHint');
+
+// ─── Show current origin (must be added to Google Cloud authorized origins) ───
+
+(function showOrigin() {
+  const origin = window.location.origin;
+  $currentOrigin.textContent = origin;
+
+  if (origin === 'null' || origin.startsWith('file://')) {
+    $originHint.innerHTML =
+      '⚠️ 你正用 <b>file://</b> 開啟頁面，Google OAuth 無法在此協定下運作。' +
+      '請改用本機 HTTP 伺服器，例如：<br>' +
+      '<code>cd reimburse-web && python3 -m http.server 8000</code><br>' +
+      '然後開啟 <code>http://localhost:8000</code>';
+    $originHint.style.color = '#c62828';
+  } else {
+    $originHint.textContent = '請確認此網址已加入 Google Cloud Console → 憑證 → OAuth 用戶端 ID → 已授權的 JavaScript 來源';
+  }
+
+  $btnCopyOrigin.addEventListener('click', () => {
+    navigator.clipboard.writeText(origin).then(() => {
+      $btnCopyOrigin.textContent = '已複製';
+      setTimeout(() => { $btnCopyOrigin.textContent = '複製'; }, 1500);
+    });
+  });
+})();
 
 // ─── Settings (persisted to localStorage) ────────────────────────────────────
 
@@ -129,7 +157,15 @@ function handleSignIn() {
 
 function onTokenResponse(resp) {
   if (resp.error) {
-    log(`授權失敗：${resp.error}`, 'error');
+    const msg = `授權失敗：${resp.error}${resp.error_description ? '（' + resp.error_description + '）' : ''}`;
+    log(msg, 'error');
+    console.error('[OAuth error]', resp);
+    alert(msg);
+    return;
+  }
+  if (!resp.access_token) {
+    log('授權回應中沒有 access_token，請檢查 Client ID 是否正確', 'error');
+    console.error('[OAuth] unexpected response:', resp);
     return;
   }
   accessToken = resp.access_token;

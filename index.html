@@ -208,6 +208,14 @@
       <div class="hint">從 Google Cloud Console 的 OAuth 憑證頁取得</div>
     </div>
     <div class="field">
+      <label>目前頁面來源（需加入 Google Cloud 已授權 JavaScript 來源）</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <code id="currentOrigin" style="flex:1;padding:7px 10px;background:#f5f5f5;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#333;font-family:monospace"></code>
+        <button type="button" id="btnCopyOrigin" style="padding:6px 12px;background:#eee;color:#333;font-size:12px;border-radius:6px;white-space:nowrap">複製</button>
+      </div>
+      <div class="hint" id="originHint"></div>
+    </div>
+    <div class="field">
       <label for="parentFolder">Google Drive 父資料夾名稱</label>
       <input type="text" id="parentFolder" value="訂閱 Claude Pro">
       <div class="hint">日期子資料夾會建立在此資料夾內，不存在時自動建立</div>
