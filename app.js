@@ -400,10 +400,10 @@ $btnProcess.addEventListener('click', async () => {
     const text = await extractPDFText(receiptFile);
     const folderName = parseDateRange(text);
     if (!folderName) {
-      throw new Error(
-        '無法從收據辨識日期區間。\n' +
-        '請確認收據包含類似「Mar 30 – Apr 30, 2026」的文字。',
-      );
+      log('── 提取到的 PDF 文字如下（請截圖回報）──', 'error');
+      // Print the full text so we can identify the actual date format
+      text.split('\n').forEach(line => { if (line.trim()) log(line.trim()); });
+      throw new Error('無法辨識日期區間，請將上方文字截圖回報');
     }
     log(`識別到日期區間：${folderName}`, 'success');
 
