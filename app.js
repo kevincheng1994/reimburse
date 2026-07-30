@@ -14,9 +14,8 @@ const MONTH = {
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let tokenClient  = null;
-let accessToken  = null;
-let gapiReady    = false;
+let tokenClient = null;
+let accessToken = null;
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 
@@ -123,30 +122,25 @@ function logLink(label, url) {
   $log.scrollTop = $log.scrollHeight;
 }
 
-// ─── Google API: gapi ─────────────────────────────────────────────────────────
+// ─── Google API: OAuth (GIS only — gapi not needed) ──────────────────────────
 
-// Called by <script onload="gapiLoaded()">
-function gapiLoaded() {
-  gapi.load('client', () => {
-    gapi.client
-      .init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] })
-      .then(() => { gapiReady = true; });
-  });
-}
+// Called by <script onload="gapiLoaded()"> — kept for HTML compatibility but unused
+function gapiLoaded() {}
 
 // Called by <script onload="gisLoaded()">
-function gisLoaded() {
-  // GIS client library ready; tokenClient initialised lazily on first sign-in
-}
-
-// ─── Google API: OAuth ────────────────────────────────────────────────────────
+function gisLoaded() {}
 
 function handleSignIn() {
+  if (typeof google === 'undefined' || !google.accounts?.oauth2) {
+    alert('Google 身份驗證程式庫尚未載入，請重新整理頁面後再試');
+    return;
+  }
   const clientId = $clientId.value.trim();
   if (!clientId) {
     alert('請先填入 Google Client ID');
     return;
   }
+  log('開啟 Google 登入視窗...');
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: clientId,
     scope: DRIVE_SCOPE,
@@ -156,27 +150,27 @@ function handleSignIn() {
 }
 
 function onTokenResponse(resp) {
+  console.log('[OAuth response]', resp);
   if (resp.error) {
-    const msg = `授權失敗：${resp.error}${resp.error_description ? '（' + resp.error_description + '）' : ''}`;
+    const msg = `授權失敗：${resp.error}` +
+      (resp.error_description ? `（${resp.error_description}）` : '');
     log(msg, 'error');
-    console.error('[OAuth error]', resp);
     alert(msg);
     return;
   }
   if (!resp.access_token) {
-    log('授權回應中沒有 access_token，請檢查 Client ID 是否正確', 'error');
-    console.error('[OAuth] unexpected response:', resp);
+    const msg = '授權回應中沒有 access_token，請檢查 Client ID 是否正確';
+    log(msg, 'error');
+    alert(msg);
     return;
   }
   accessToken = resp.access_token;
-  gapi.client.setToken({ access_token: accessToken });
   setAuthUI(true);
   log('已登入 Google Drive', 'success');
 }
 
 function handleSignOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
-  gapi.client.setToken(null);
   accessToken = null;
   setAuthUI(false);
   log('已登出');
