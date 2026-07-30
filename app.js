@@ -149,21 +149,21 @@ function clearToken() {
 // Called by <script onload="gapiLoaded()"> — kept for HTML compatibility but unused
 function gapiLoaded() {}
 
-// Called by <script onload="gisLoaded()">
-function gisLoaded() {
-  tryAutoSignIn();
-}
+// Called by <script onload="gisLoaded()"> — fires before app.js loads, so a no-op here.
+// Session restoration is handled directly at the bottom of this file instead.
+function gisLoaded() {}
 
 function tryAutoSignIn() {
-  // If a valid token is stored, restore the session immediately — no popup needed.
+  // Restore from a saved, still-valid token — no GIS or network call needed.
   const saved = loadSavedToken();
   if (saved) {
     accessToken = saved;
     setAuthUI(true);
     return;
   }
-  // Token expired: try a silent GIS refresh (works when browser still has Google session).
+  // Token expired: try a silent GIS refresh only if the library is already loaded.
   if (!localStorage.getItem('reimb_signedIn')) return;
+  if (typeof google === 'undefined' || !google.accounts?.oauth2) return;
   const clientId = $clientId.value.trim();
   if (!clientId) return;
   tokenClient = google.accounts.oauth2.initTokenClient({
@@ -233,6 +233,9 @@ function setAuthUI(signedIn) {
 
 $btnSignIn.addEventListener('click', handleSignIn);
 $btnSignOut.addEventListener('click', handleSignOut);
+
+// Restore persisted session immediately — does not wait for GIS to load.
+tryAutoSignIn();
 
 // ─── PDF.js: initialise worker ────────────────────────────────────────────────
 
